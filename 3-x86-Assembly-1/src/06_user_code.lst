@@ -1,0 +1,15 @@
+     1                                  ;加载器所要加载的用户程序
+     2                                  
+     3                                  SECTION header vstart=0				;用户程序加载头部
+     4                                  
+     5                                  SECTION code_1 align=16 vstart=0	;定义为代码段1
+     6                                  
+     7                                  SECTION code_2 align=16 vstart=0	;定义为代码段2
+     8                                  
+     9                                  SECTION data_1 align=16 vstart=0	;定义为数据段1
+    10                                  
+    11                                  SECTION data_2 align=16 vstart=0	;定义为数据段2
+    12                                  
+    13                                  SECTION stack align=16 vstart=0		;定义为栈段
+    14                                  
+    15                                  program_end:						;空标记,程序结束位置
