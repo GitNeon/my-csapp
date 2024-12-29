@@ -31,6 +31,43 @@ SECTION MBR align=16 vstart=0x7c00		;定义一个段，因为主引导扇区的�
 	sub bx,bx				;读的数据放到DS:[BX]处,BX从0处开始
 	call read_logic_sector	;以上3条指令设置完参数后调用read_logic_sector过程
 	
+	;获取用户程序定义的程序长度字段，最开始的双字：program_length dd
+	;将该双字放到DX:AX中，判断是不是除尽,也就是判断用户程序是否正好占满扇区数
+	;AX就是用户程序实际占用的扇区数,如果有余数，说明扇区需要+1
+	mov dx,[2]
+	mov ax,[0]
+	mov bx,512
+	div bx
+	cmp dx,0	
+	jnz @1		;未除尽情况，扇区需要+1
+	dec ax		;已经读了一个扇区，就减1
+	
+	@1:
+	cmp ax,0	;考虑用户程序实际长度小于512字节
+	jz direct	;为0则意味着用户程序全部读取完毕，继续下一步
+	
+	;否则读取剩余的扇区
+	push ds		;以下要CS寄存器，先保存到栈中
+	
+	mov cx,ax	;循环次数(剩余扇区)
+	@2:
+	mov ax,ds
+	add ax,0x20	;512字节即0x200,右移四位后正好是0x20
+	mov ds,ax	;构造一个新段，避免用户程序太大覆盖掉原有段
+	
+	sub bx,bx	;每次读时，偏移地址使用从0x0000开始
+	inc si		;下一个逻辑扇区
+	call read_logic_sector
+	loop @2		;循环读完，直到读完整个功能程序
+	
+	pop ds
+	
+	
+	direct:		;计算入口点代码段地址
+	
+	
+	
+	
 read_logic_sector:		;从硬盘读取一个逻辑扇区
 	
 	;保存用到的寄存器
@@ -68,11 +105,11 @@ read_logic_sector:		;从硬盘读取一个逻辑扇区
 
 	;等待硬盘空闲且硬盘已准备好数据传输 
 	waits:
-		in al,dx		;获得硬盘返回结果
-		and al,0x88		;10001000B
-		cmp al,0x08		;00001000B，比较是否硬盘准备好数据
-		jnz waits		;没准备就一直等
-		
+	in al,dx		;获得硬盘返回结果
+	and al,0x88		;10001000B
+	cmp al,0x08		;00001000B，比较是否硬盘准备好数据
+	jnz waits		;没准备就一直等
+	
 
 	;读取512字节，也就是一个扇区,循环256次就是按字读
 	mov cx,256
@@ -81,11 +118,11 @@ read_logic_sector:		;从硬盘读取一个逻辑扇区
 	
 	;准备好后开始读取数据
 	read_data:
-		in ax,dx		;从端口获得数据
-		mov [bx],ax 	;读取的数据存放到由段寄存器DS指定的数据段,偏移地址由寄存器BX指定
-		add bx,2
-		loop read_data
-		
+	in ax,dx		;从端口获得数据
+	mov [bx],ax 	;读取的数据存放到由段寄存器DS指定的数据段,偏移地址由寄存器BX指定
+	add bx,2
+	loop read_data
+	
 	
 	;寄存器恢复
 	pop dx
