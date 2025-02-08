@@ -1,9 +1,0 @@
-     1 00000000 B800B8                  mov ax,0xb800
-     2 00000003 8ED8                    mov ds,ax
-     3 00000005 C606000061              mov byte [0x00], 'a'
-     4 0000000A C606020073              mov byte [0x02], 's'
-     5 0000000F C60604006D              mov byte [0x04], 'm'
-     6 00000014 EBFE                    jmp $
-     7                                  
-     8 00000016 00<rep 1E8h>            times 510-($-$$) db 0
-     9 000001FE 55AA                    dw 0aa55H
