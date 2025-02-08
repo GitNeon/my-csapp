@@ -1,0 +1,27 @@
+     1                                  ;显示彩色的Label offset:
+     2 00000000 E90D00                  jmp near start
+     3                                  
+     4 00000003 4C6162656C206F6666-     showText db 'L','a','b','e','l',' ','o','f','f','s','e','t',':'
+     4 0000000C 7365743A           
+     5                                  
+     6 00000010 B800B8                  start:	mov ax,0xb800
+     7 00000013 8EC0                    		mov es,ax			;显示缓冲区所在段地址
+     8                                  
+     9 00000015 BB007C                  		mov bx,0x7c00		;主引导程序是在内存0x0000:0x7c00处开始加载的,因此一定不要忘记加上这个地址
+    10                                  
+    11 00000018 B90D00                  		mov cx,start - showText			;获得循环次数
+    12 0000001B BE[0300]                		mov si,showText
+    13 0000001E BF0000                  		mov di,0
+    14                                  
+    15 00000021 8A00                    loopstr:mov byte al, [bx+si]		;先取得原有字符
+    16 00000023 B417                    		mov byte ah, 0x17			;设置颜色格式,蓝底白字
+    17 00000025 268905                  		mov [es:di],ax				;复制单个字符到显示缓冲区
+    18 00000028 46                      		inc si
+    19 00000029 83C702                  		add di,2
+    20 0000002C E2F3                    		loop loopstr
+    21                                  
+    22                                  	
+    23 0000002E E9FDFF                  jmp near $
+    24                                  
+    25 00000031 00<rep 1CDh>            times 510-($-$$) db 0
+    26 000001FE 55AA                    db 0x55,0xaa

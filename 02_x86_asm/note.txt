@@ -1,0 +1,5 @@
+1.编译命令：
+nasm -f bin example.asm -o ./bin/example.bin
+参数说明：
+* -f表示format格式化输出为bin文件
+* -o表示output输出文件路径
