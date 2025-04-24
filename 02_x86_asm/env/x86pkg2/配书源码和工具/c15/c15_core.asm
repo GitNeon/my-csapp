@@ -248,7 +248,7 @@ allocate_memory:                            ;分配内存
       
          ;这里应当有检测可用内存数量的指令
           
-         mov ecx,[ram_alloc]                ;返回分配的起始地址
+         mov ecx,[ram_alloc]   				;ecx 寄存器是作为输出参数用于返回本次分配得到的内存起始地址的          
 
          mov ebx,eax
          and ebx,0xfffffffc
@@ -277,7 +277,7 @@ set_up_gdt_descriptor:                      ;在GDT内安装一个新的描述符
          mov ebx,core_data_seg_sel          ;切换到核心数据段
          mov ds,ebx
 
-         sgdt [pgdt]                        ;以便开始处理GDT
+         sgdt [pgdt]                        ;sgdt指令取得GDT基址和大小存入pgdt这个地方
 
          mov ebx,mem_0_4_gb_seg_sel
          mov es,ebx

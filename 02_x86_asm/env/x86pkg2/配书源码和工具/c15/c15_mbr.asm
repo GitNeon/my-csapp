@@ -142,9 +142,9 @@ read_hard_disk_0:                        ;从硬盘读取一个逻辑扇区
          push eax 
          push ecx
          push edx
-      
+		 
          push eax
-         
+		 
          mov dx,0x1f2
          mov al,1
          out dx,al                       ;读取的扇区数
@@ -194,19 +194,19 @@ read_hard_disk_0:                        ;从硬盘读取一个逻辑扇区
 ;-------------------------------------------------------------------------------
 make_gdt_descriptor:                     ;构造描述符
                                          ;输入：EAX=线性基地址
-                                         ;      EBX=段界限
+                                         ;      EBX=段界限，只用其低20位
                                          ;      ECX=属性（各属性位都在原始
                                          ;      位置，其它没用到的位置0） 
                                          ;返回：EDX:EAX=完整的描述符
          mov edx,eax
          shl eax,16                     
          or ax,bx                        ;描述符前32位(EAX)构造完毕
-      
-         and edx,0xffff0000              ;清除基地址中无关的位
-         rol edx,8
+		;这一段完成高32位中段基地址的31~24和23~16位装配
+         and edx,0xffff0000              ;清除基地址中无关的位，提取段基址的31~16位
+         rol edx,8						 ;循环左移8位，这样31~24位跑到7~0位上去
          bswap edx                       ;装配基址的31~24和23~16  (80486+)
-      
-         xor bx,bx
+         
+		 xor bx,bx						; and ebx, 0x000f0000
          or edx,ebx                      ;装配段界限的高4位
       
          or edx,ecx                      ;装配属性 

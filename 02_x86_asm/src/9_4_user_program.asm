@@ -69,7 +69,7 @@ SECTION code_seg_1 align=16 vstart=0
 		;1行：80  ---------- 159
 		;2行：160 ---------- 239
 		;假设光标位置是220，除以80得到商（行号）=2，再乘以80，得到160，证明了这是行首
-		cmp 0x0d
+		cmp cl,0x0d
 		jnz .put_0a		;不是，再判断是不是换行符
 		mov ax,bx
 		mov bl,80		
@@ -79,20 +79,11 @@ SECTION code_seg_1 align=16 vstart=0
 		jmp .set_cursor	;跳转到设置光标
 		
 	.put_0a:
-		cmp cl 0x0a			;是不是换行符
+		cmp cl,0x0a			;是不是换行符
 		jnz .put_other		;不是，正常显示字符
 		add bx,80			;是换行符就+1行
 		jmp .roll_screnn	;如果光标原先就在屏幕最后一行，那么应该根据情况滚屏
-		 
-		pop es
-        pop ds
-        pop dx
-        pop cx
-        pop bx
-        pop ax
-
-        ret
-	
+		 	
 	;正常显示可打印字符
 	;光标占用一个字符的位置，一个字符=2个字节，所以：光标在显存中的偏移地址=字符位置*2=下一个字符的位置
 	.put_other:
@@ -135,8 +126,28 @@ SECTION code_seg_1 align=16 vstart=0
 		sub bx,80		;滚屏后，移动到最后一行的行首，因为之前判断是不是换行符已经加了80
 	
 	.set_cursor:
+		mov dx,0x3d4,
+		mov al,0x0e
+		out dx,al		;通过端口0x3d4访问索引寄存器，写入0x0e,表示访问光标寄存器高8位
+		mov dx,0x3d5
+		mov al,bh
+		out dx,al		;通过数据端口写入BX寄存器中高8位数值
+		;同样的写入低8位
+		mov dx,0x3d4
+		mov al,0x0f
+		out dx,al
+		mov dx,0x3d5
+		mov al,bl
+		out dx,al
 		
-	
+		pop es
+        pop ds
+        pop dx
+        pop cx
+        pop bx
+        pop ax
+
+        ret
 	start:
 		mov ax,[stack_seg_item]			;设置自己的栈段
 		mov ss,ax
@@ -146,13 +157,34 @@ SECTION code_seg_1 align=16 vstart=0
 		mov ds,ax
 		
 		mov bx,msg0
-		call put_string					;调用过程显示第一段信息
+		call display_string				;调用过程显示第一段信息
+		
+		;这里使用retf实现段间转移，ref不依赖于call far或者jmp far指令
+		;retf指令依次从栈中弹出IP、CS
+		push word [es:code_seg_2_item]	;压入代码段code_seg_2段地址
+		mov ax,begin				
+		push ax						;压入偏移地址
+		retf						;转移到代码段2执行
+	
+	continue:
+		mov ax,[es:data_seg_2_item]
+		mov ds,ax					;切换到数据段2
+		mov bx,msg1
+		call display_string
+		
+		jmp $
 		
 code_seg_1_end:
 
 ;代码段2
 SECTION code_seg_2 align=16 vstart=0
 
+	begin:
+		push word [es:code_seg_1_item]
+		mov ax,continue
+		push ax
+		retf						;转移到代码段1继续执行
+	
 code_seg_2_end:
 
 ;数据段1
@@ -180,7 +212,9 @@ data_seg_1_end:
 
 ;数据段2
 SECTION data_seg_2 align=16 vstart=0
-
+    msg1 db '  The above contents is written by LeeChung. '
+         db '2011-05-06'
+         db 0
 data_seg_2_end:
 
 ;栈段

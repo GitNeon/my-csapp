@@ -976,7 +976,7 @@ start:
          mov ecx,0x46
          call sys_routine_seg_sel:allocate_memory
          call append_to_tcb_link            ;将此TCB添加到TCB链中
-         mov esi,ecx
+         mov esi,ecx						;ESI保存的是刚刚创建的TCB线性基地址
 
          ;为内核任务的TSS分配内存空间
          mov ecx,104                        ;为该任务的TSS分配内存

@@ -1,0 +1,274 @@
+     1                                  ;9-4 用户程序的优化：
+     2                                  ;思考：将代码段1中的子过程优化为通过call指令调用，类似于高级语言的函数调用，增强可阅读性
+     3                                  
+     4                                  ;程序头部段
+     5                                  SECTION header vstart=0
+     6 00000000 [00000000]              	program_length	dd program_end							;[0x00] 程序总长度
+     7 00000004 [BA00]                  	program_entry	dw start								;[0x04] 程序入口，偏移地址
+     8 00000006 [00000000]              					dd section.code_seg_1.start				;[0x06] 段地址
+     9 0000000A 0500                    	seg_table_len	dw (header_end - code_seg_1_item)/4		;[0x0a] 段重定位表项数量
+    10                                  	
+    11                                  	;段重定位表
+    12 0000000C [00000000]              	code_seg_1_item dd section.code_seg_1.start				;[0x0c] 代码段1的段地址
+    13 00000010 [00000000]              	code_seg_2_item dd section.code_seg_2.start				;[0x10] 代码段2的段地址
+    14 00000014 [00000000]              	data_seg_1_item dd section.data_seg_1.start				;[0x14] 数据段1的段地址
+    15 00000018 [00000000]              	data_seg_2_item dd section.data_seg_2.start				;[0x18] 数据段2的段地址
+    16 0000001C [00000000]              	stack_seg_item	dd section.stack_seg.start				;[0x1c] 栈段段地址
+    17                                  header_end:
+    18                                  
+    19                                  ;代码段1
+    20                                  SECTION code_seg_1 align=16 vstart=0
+    21                                  
+    22                                  	; 过程：显示字符串
+    23                                  	; 输入: DS:BX=字符串的段地址:偏移地址
+    24                                  	display_string:
+    25 00000000 50                      		push ax
+    26 00000001 53                      		push bx
+    27 00000002 51                      		push cx
+    28                                  	.display_loop:
+    29 00000003 8A0F                    		mov cl, [bx]  ; 从ds:bx地址处获得单个字符
+    30 00000005 08C9                    		or cl, cl     ; 影响标志寄存器中的ZF位，ZF=0说明取到了字符串0终止
+    31 00000007 7406                    		jz .exit_string
+    32 00000009 E80700                  		call put_char
+    33 0000000C 43                      		inc bx
+    34 0000000D EBF4                    		jmp .display_loop
+    35                                  	.exit_string:
+    36 0000000F 59                      		pop cx
+    37 00000010 5B                      		pop bx
+    38 00000011 58                      		pop ax
+    39 00000012 C3                      		ret
+    40                                  
+    41                                  	; 过程：显示单个字符
+    42                                  	; 输入：cl=单个字符ascii码
+    43                                  	put_char:
+    44 00000013 50                      		push ax
+    45 00000014 53                      		push bx
+    46 00000015 51                      		push cx
+    47 00000016 52                      		push dx
+    48 00000017 1E                      		push ds
+    49 00000018 06                      		push es  ; 保护现场，相关寄存器压栈保护
+    50                                  
+    51 00000019 E80D00                  		call get_cursor  ; 获取光标当前位置
+    52 0000001C E82300                  		call handle_char ; 处理字符
+    53 0000001F E87F00                  		call set_cursor  ; 设置光标位置
+    54                                  
+    55 00000022 07                      		pop es
+    56 00000023 1F                      		pop ds
+    57 00000024 5A                      		pop dx
+    58 00000025 59                      		pop cx
+    59 00000026 5B                      		pop bx
+    60 00000027 58                      		pop ax
+    61 00000028 C3                      		ret
+    62                                  
+    63                                  	; 过程：获取光标位置
+    64                                  	; 输出：BX=光标位置16位数
+    65                                  	get_cursor:
+    66                                  		; 这段获取的是光标高8位
+    67 00000029 BAD403                  		mov dx, 0x3d4  ; 索引寄存器端口号为0x3d4
+    68 0000002C B00E                    		mov al, 0x0e   ; 光标寄存器高8位，索引值是14(0x0e)
+    69 0000002E EE                      		out dx, al     ; 向该端口写入值，表示访问光标寄存器(该光标寄存器存储着光标值的高8位)
+    70 0000002F BAD503                  		mov dx, 0x3d5  ; 数据端口为0x3d5
+    71 00000032 EC                      		in al, dx      ; 从这个端口读入1字节数据存放到al寄存器中
+    72 00000033 88C4                    		mov ah, al     ; 放到高8位
+    73                                  		; 这段获取的是光标低8位
+    74 00000035 BAD403                  		mov dx, 0x3d4
+    75 00000038 B00F                    		mov al, 0x0f   ; 光标寄存器低8位，索引值是15
+    76 0000003A EE                      		out dx, al     ; 访问光标寄存器低8位
+    77 0000003B BAD503                  		mov dx, 0x3d5
+    78 0000003E EC                      		in al, dx      ; 低8位
+    79 0000003F 89C3                    		mov bx, ax     ; BX=光标位置16位数
+    80 00000041 C3                      		ret
+    81                                  
+    82                                  	; 过程：处理字符
+    83                                  	; 输入：CL=单个字符ASCII码，BX=光标位置
+    84                                  	handle_char:
+    85 00000042 80F90D                  		cmp cl, 0x0d    ; 是不是回车字符
+    86 00000045 7407                    		jz .handle_cr   ; 是回车字符，跳转到处理回车
+    87 00000047 80F90A                  		cmp cl, 0x0a    ; 是不是换行符
+    88 0000004A 740E                    		jz .handle_lf   ; 是换行符，跳转到处理换行
+    89 0000004C EB14                    		jmp .handle_other ; 正常显示可打印字符
+    90                                  
+    91                                  	.handle_cr:
+    92 0000004E 89D8                    		mov ax, bx
+    93 00000050 B350                    		mov bl, 80
+    94 00000052 F6F3                    		div bl          ; 除以80得到行号,这是16位除法，商放在AL中
+    95 00000054 F6E3                    		mul bl          ; 此时，AX中存放的就是当前行首的光标值
+    96 00000056 89C3                    		mov bx, ax
+    97 00000058 EB17                    		jmp .end_handle
+    98                                  
+    99                                  	.handle_lf:
+   100 0000005A 83C350                  		add bx, 80      ; 是换行符就+1行
+   101 0000005D E81200                  		call roll_screen ; 如果光标原先就在屏幕最后一行，那么应该根据情况滚屏
+   102 00000060 EB0F                    		jmp .end_handle
+   103                                  
+   104                                  	.handle_other:
+   105 00000062 B800B8                  		mov ax, 0xb800  ; 显存地址
+   106 00000065 8EC0                    		mov es, ax
+   107 00000067 D1E3                    		shl bx, 1       ; 左移一位相当于乘以2
+   108 00000069 26880F                  		mov [es:bx], cl ; 写入所显示的字符
+   109 0000006C D1EB                    		shr bx, 1       ; 下一个字符位置，将字节偏移地址恢复为字符位置
+   110 0000006E 83C301                  		add bx, 1       ; 字符位置+1
+   111                                  
+   112                                  	.end_handle:
+   113 00000071 C3                      		ret
+   114                                  
+   115                                  	; 过程：滚屏
+   116                                  	; 输入：BX=光标位置
+   117                                  	roll_screen:
+   118 00000072 81FBD007                		cmp bx, 2000
+   119 00000076 7C28                    		jl .end_roll    ; 如果光标小于2000，没有超出屏幕显示，反之，需要执行滚动屏幕内容
+   120 00000078 53                      		push bx         ; 待会要用到bx寄存器，所以先压栈保存
+   121 00000079 B800B8                  		mov ax, 0xb800
+   122 0000007C 8ED8                    		mov ds, ax
+   123 0000007E 8EC0                    		mov es, ax
+   124 00000080 FC                      		cld             ; clear direction flag,清除方向标志位
+   125 00000081 BEA000                  		mov si, 0xa0    ; 源位置0xa0=160，从屏幕第2行第1列的位置开始
+   126 00000084 BF0000                  		mov di, 0x00    ; 目标位置从0x00处开始，屏幕第1行第1列
+   127 00000087 B98007                  		mov cx, 1920    ; 1920=24行*每行80个字符*每个字符的占用字节数 / 字(2字节)
+   128 0000008A F3A5                    		rep movsw       ; rep=重复执行,movsw = mov string word, DS:SI -> ES:DI
+   129                                  
+   130                                  		; 由于屏幕最后一行还保持的原来的内容，需要清除最后一行
+   131 0000008C BB000F                  		mov bx, 3840    ; 屏幕上第25行第1列在显存中的偏移位置
+   132 0000008F B95000                  		mov cx, 80
+   133                                  	.cls:
+   134 00000092 26C7072007              		mov word [es:bx], 0x0720  ; 黑底白字的空白字符
+   135 00000097 83C302                  		add bx, 2
+   136 0000009A E2F6                    		loop .cls
+   137                                  
+   138 0000009C 5B                      		pop bx
+   139 0000009D 83EB50                  		sub bx, 80    ; 滚屏后，移动到最后一行的行首，因为之前判断是不是换行符已经加了80
+   140                                  	.end_roll:
+   141 000000A0 C3                      		ret
+   142                                  
+   143                                  	; 过程：设置光标位置
+   144                                  	; 输入：BX=光标位置
+   145                                  	set_cursor:
+   146 000000A1 BAD403                  		mov dx, 0x3d4
+   147 000000A4 B00E                    		mov al, 0x0e
+   148 000000A6 EE                      		out dx, al     ; 通过端口0x3d4访问索引寄存器，写入0x0e,表示访问光标寄存器高8位
+   149 000000A7 BAD503                  		mov dx, 0x3d5
+   150 000000AA 88F8                    		mov al, bh
+   151 000000AC EE                      		out dx, al     ; 通过数据端口写入BX寄存器中高8位数值
+   152                                  		; 同样的写入低8位
+   153 000000AD BAD403                  		mov dx, 0x3d4
+   154 000000B0 B00F                    		mov al, 0x0f
+   155 000000B2 EE                      		out dx, al
+   156 000000B3 BAD503                  		mov dx, 0x3d5
+   157 000000B6 88D8                    		mov al, bl
+   158 000000B8 EE                      		out dx, al
+   159 000000B9 C3                      		ret
+   160                                  
+   161                                  	start:
+   162 000000BA A1[1C00]                		mov ax,[stack_seg_item]			;设置自己的栈段
+   163 000000BD 8ED0                    		mov ss,ax
+   164 000000BF BC[0001]                		mov sp,stack_seg_end			;栈指针地址为256
+   165                                  		
+   166 000000C2 A1[1400]                		mov ax,[data_seg_1_item]		;设置自己的数据段
+   167 000000C5 8ED8                    		mov ds,ax
+   168                                  		
+   169 000000C7 BB[0000]                		mov bx,msg0
+   170 000000CA E833FF                  		call display_string				;调用过程显示第一段信息
+   171                                  		
+   172                                  		;这里使用retf实现段间转移，ref不依赖于call far或者jmp far指令
+   173                                  		;retf指令依次从栈中弹出IP、CS
+   174 000000CD 26FF36[1000]            		push word [es:code_seg_2_item]	;压入代码段code_seg_2段地址
+   175 000000D2 B8[0000]                		mov ax,begin				
+   176 000000D5 50                      		push ax						;压入偏移地址
+   177 000000D6 CB                      		retf						;转移到代码段2执行
+   178                                  	
+   179                                  	continue:
+   180 000000D7 26A1[1800]              		mov ax,[es:data_seg_2_item]
+   181 000000DB 8ED8                    		mov ds,ax					;切换到数据段2
+   182 000000DD BB[0000]                		mov bx,msg1
+   183 000000E0 E81DFF                  		call display_string
+   184                                  		
+   185 000000E3 EBFE                    		jmp $
+   186                                  
+   187                                  code_seg_1_end:
+   188                                  
+   189                                  ;代码段2
+   190                                  SECTION code_seg_2 align=16 vstart=0
+   191                                  
+   192                                  	begin:
+   193 00000000 26FF36[0C00]            		push word [es:code_seg_1_item]
+   194 00000005 B8[D700]                		mov ax,continue
+   195 00000008 50                      		push ax
+   196 00000009 CB                      		retf						;转移到代码段1继续执行
+   197                                  	
+   198                                  code_seg_2_end:
+   199                                  
+   200                                  ;数据段1
+   201                                  SECTION data_seg_1 align=16 vstart=0
+   202                                  	;屏幕上需要显示的信息
+   203                                  	;0x0d-回车，0x0a-换行
+   204 00000000 202054686973207573-         msg0 db '  This user program is changed. '
+   204 00000009 65722070726F677261-
+   204 00000012 6D206973206368616E-
+   204 0000001B 6765642E20         
+   205 00000020 4261636B2061742053-              db 'Back at SourceForge and in intensive development! '
+   205 00000029 6F75726365466F7267-
+   205 00000032 6520616E6420696E20-
+   205 0000003B 696E74656E73697665-
+   205 00000044 20646576656C6F706D-
+   205 0000004D 656E742120         
+   206 00000052 476574207468652063-              db 'Get the current versions from http://www.nasm.us/.'
+   206 0000005B 757272656E74207665-
+   206 00000064 7273696F6E73206672-
+   206 0000006D 6F6D20687474703A2F-
+   206 00000076 2F7777772E6E61736D-
+   206 0000007F 2E75732F2E         
+   207 00000084 0D0A0D0A                         db 0x0d,0x0a,0x0d,0x0a
+   208 00000088 20204578616D706C65-              db '  Example code for calculate 1+2+...+1000:',0x0d,0x0a,0x0d,0x0a
+   208 00000091 20636F646520666F72-
+   208 0000009A 2063616C63756C6174-
+   208 000000A3 6520312B322B2E2E2E-
+   208 000000AC 2B313030303A0D0A0D-
+   208 000000B5 0A                 
+   209 000000B6 2020202020786F7220-              db '     xor dx,dx',0x0d,0x0a
+   209 000000BF 64782C64780D0A     
+   210 000000C6 2020202020786F7220-              db '     xor ax,ax',0x0d,0x0a
+   210 000000CF 61782C61780D0A     
+   211 000000D6 2020202020786F7220-              db '     xor cx,cx',0x0d,0x0a
+   211 000000DF 63782C63780D0A     
+   212 000000E6 202040403A0D0A                   db '  @@:',0x0d,0x0a
+   213 000000ED 2020202020696E6320-              db '     inc cx',0x0d,0x0a
+   213 000000F6 63780D0A           
+   214 000000FA 202020202061646420-              db '     add ax,cx',0x0d,0x0a
+   214 00000103 61782C63780D0A     
+   215 0000010A 202020202061646320-              db '     adc dx,0',0x0d,0x0a
+   215 00000113 64782C300D0A       
+   216 00000119 2020202020696E6320-              db '     inc cx',0x0d,0x0a
+   216 00000122 63780D0A           
+   217 00000126 2020202020636D7020-              db '     cmp cx,1000',0x0d,0x0a
+   217 0000012F 63782C313030300D0A 
+   218 00000138 20202020206A6C6520-              db '     jle @@',0x0d,0x0a
+   218 00000141 40400D0A           
+   219 00000145 20202020202E2E2E20-              db '     ... ...(Some other codes)',0x0d,0x0a,0x0d,0x0a
+   219 0000014E 2E2E2E28536F6D6520-
+   219 00000157 6F7468657220636F64-
+   219 00000160 6573290D0A0D0A     
+   220 00000167 00                               db 0	;标志字符串结束，0终止的字符串
+   221                                  data_seg_1_end:
+   222                                  
+   223                                  ;数据段2
+   224                                  SECTION data_seg_2 align=16 vstart=0
+   225 00000000 20205468652061626F-         msg1 db '  The above contents is written by LeeChung. '
+   225 00000009 766520636F6E74656E-
+   225 00000012 747320697320777269-
+   225 0000001B 7474656E206279204C-
+   225 00000024 65654368756E672E20 
+   226 0000002D 323031312D30352D30-              db '2011-05-06'
+   226 00000036 36                 
+   227 00000037 00                               db 0
+   228                                  data_seg_2_end:
+   229                                  
+   230                                  ;栈段
+   231                                  SECTION stack_seg align=16 vstart=0
+   232 00000000 <res 100h>              	resb 256	;从当前位置开始保留指定数量的字节，但不初始化它们的值
+   232          ******************       warning: uninitialized space declared in stack_seg section: zeroing [-w+zeroing]
+   233                                  				;汇编地址范围0~255
+   234                                  stack_seg_end:	;此处地址则为256
+   235                                  
+   236                                  ;程序尾部，用于获得程序整体长度
+   237                                  SECTION tail align=16
+   238                                  program_end:
