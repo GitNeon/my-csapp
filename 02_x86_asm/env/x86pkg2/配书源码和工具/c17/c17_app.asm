@@ -76,8 +76,8 @@ start:
 
          mov ax,cs
          and al,0000_0011B
-         or al,0x30
-         mov [cpl],al
+         or al,0x30				;转换成数字字符
+         mov [cpl],al			;当前特权级
 
          mov ebx,message_1
          call far [fs:PrintString]
