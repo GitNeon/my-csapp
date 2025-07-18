@@ -18,11 +18,11 @@ SECTION  mbr  vstart=0x00007c00
          push word LDR_PHY_ADDR >> 4                  ;压入缓冲区的逻辑段地址
          push word 0                                  ;压入缓冲区的起始偏移量
          push word 0x0001                             ;传输的扇区数
-         push word 0x0010                             ;地址结构尺寸及保留字节
+         push word 0x0010                             ;地址结构尺寸及保留字节,固定16字节
          mov si, sp
-         mov ah, 0x42                                 ;INT 13H扩展读功能
-         mov dl, 0x80                                 ;主盘
-         int 0x13                                     ;成功则CF=0,AH=0；失败则CF=1且AH=错误代码
+         mov ah, 0x42                                 ;参数1: 0x42，表明要读硬盘
+         mov dl, 0x80                                 ;主盘，参数2: 0x80，第一硬盘编号
+         int 0x13                                     ;INT 13H扩展读功能，成功则CF=0,AH=0；失败则CF=1且AH=错误代码
          mov bp, msg0
          mov di, msg1 - msg0
          jc go_err                                    ;读磁盘失败，显示信息并停机
@@ -77,11 +77,11 @@ SECTION  mbr  vstart=0x00007c00
 
   go_err:
          mov ah, 0x03                                 ;获取光标位置
-         mov bh, 0x00
+         mov bh, 0x00                                 ;默认显示页号=0
          int 0x10
 
          mov cx, di
-         mov ax, 0x1301                               ;写字符串，光标移动
+         mov ax, 0x1301                               ;0x13=写字符串，0x01=光标移动，将功能号 0x13 和子功能号 0x01 组合后存入寄存器 ax
          mov bh, 0
          mov bl, 0x07                                 ;属性：常规黑底白字
          int 0x10                                     ;显示字符串

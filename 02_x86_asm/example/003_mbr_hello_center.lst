@@ -1,0 +1,54 @@
+     1                                  [org 0x7c00]
+     2 00000000 31C0                    xor ax, ax
+     3 00000002 8ED8                    mov ds, ax          ; DS = 0（数据段）
+     4 00000004 8EC0                    mov es, ax          ; ES 临时用
+     5                                  
+     6                                  ; 计算屏幕中间位置：12行40列
+     7                                  ; 位置 = 12 * 80 + 40 = 1000
+     8 00000006 B9E803                  mov cx, 1000      ; CX存储起始位置值
+     9                                  
+    10                                  ; 计算字符串长度并加到起始位置上
+    11 00000009 BE[4300]                mov si, message   ; SI指向消息的起始地址
+    12 0000000C 83C10B                  add cx, message_end - message  ; 起始位置 + 字符串长度 = 结束位置
+    13                                  
+    14                                  ; 设置光标位置到字符串末尾的下一个位置
+    15 0000000F BAD403                  mov dx, 0x3D4     ; 索引端口
+    16 00000012 B00E                    mov al, 0x0E      ; 选择光标位置高位寄存器
+    17 00000014 EE                      out dx, al
+    18 00000015 BAD503                  mov dx, 0x3D5     ; 数据端口
+    19 00000018 88E8                    mov al, ch        ; 获取CX的高8位
+    20 0000001A EE                      out dx, al
+    21                                  
+    22 0000001B BAD403                  mov dx, 0x3D4     ; 索引端口
+    23 0000001E B00F                    mov al, 0x0F      ; 选择光标位置低位寄存器
+    24 00000020 EE                      out dx, al
+    25 00000021 BAD503                  mov dx, 0x3D5     ; 数据端口
+    26 00000024 88C8                    mov al, cl        ; 获取CX的低8位
+    27 00000026 EE                      out dx, al
+    28                                  
+    29                                  ; 设置 ES:DI 指向显存 (0xB800:2000)
+    30 00000027 B800B8                  mov ax, 0xB800
+    31 0000002A 8EC0                    mov es, ax
+    32 0000002C BFD007                  mov di, 2000        ; 1000 * 2 = 2000
+    33                                  
+    34                                  ; 打印字符串
+    35 0000002F B90B00                  mov cx, message_end - message
+    36 00000032 B407                    mov ah, 0x07        ; 黑底白字
+    37                                  
+    38                                  print_loop:
+    39 00000034 8A04                        mov al, [si]    ; 字符
+    40 00000036 268905                      mov [es:di], ax ; 写入字符+属性
+    41 00000039 83C601                      add si, 1       ; SI++
+    42 0000003C 83C702                      add di, 2       ; DI += 2
+    43 0000003F E2F3                        loop print_loop
+    44                                  
+    45                                  done:
+    46 00000041 EBFE                        jmp $
+    47                                  
+    48                                  message:
+    49 00000043 48656C6C6F20776F72-         db 'Hello world'
+    49 0000004C 6C64               
+    50                                  message_end:
+    51                                  
+    52 0000004E 00<rep 1B0h>            times 510-($-$$) db 0
+    53 000001FE 55AA                    dw 0xAA55           ; 引导扇区签名

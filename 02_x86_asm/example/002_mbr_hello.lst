@@ -1,0 +1,28 @@
+     1                                  ; hello_asm.asm - 16位汇编程序，通过直接写显存显示"Hello world"
+     2                                  [org 0x7c00]      ; 程序加载到 0x7c00
+     3 00000000 31C0                    xor ax, ax        ; AX = 0
+     4 00000002 8ED8                    mov ds, ax        ; DS = 0（数据段）
+     5 00000004 B800B8                  mov ax, 0xb800    ; 显存段
+     6 00000007 8EC0                    mov es, ax        ; ES = 0xb800
+     7 00000009 BE[2300]                mov si, message   ; SI -> 字符串
+     8 0000000C BF0000                  mov di, 0         ; DI -> 显存位置
+     9 0000000F B90B00                  mov cx, message_end - message  ; CX = 字符串长度
+    10                                  
+    11                                  print_loop:
+    12 00000012 8A04                        mov al, [si]      ; 字符 -> AL
+    13 00000014 B407                        mov ah, 0x07      ; 属性（黑底白字）-> AH
+    14 00000016 268905                      mov [es:di], ax   ; 写入显存（ES:DI）
+    15 00000019 83C601                      add si, 1         ; SI++
+    16 0000001C 83C702                      add di, 2         ; DI += 2
+    17 0000001F E2F1                        loop print_loop
+    18                                  
+    19                                  done:
+    20 00000021 EBFE                        jmp $             ; 无限循环
+    21                                  
+    22                                  message:
+    23 00000023 48656C6C6F20776F72-         db 'Hello world'
+    23 0000002C 6C64               
+    24                                  message_end:
+    25                                  
+    26 0000002E 00<rep 1D0h>            times 510-($-$$) db 0
+    27 000001FE 55AA                    dw 0xAA55           ; 引导扇区签名

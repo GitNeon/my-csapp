@@ -17,7 +17,7 @@ section core_code                                 ;内核代码段
 
 %include "..\common\core_utils64.wid"             ;引入内核用到的例程
 
-         bits 64
+[bits 64]
 
 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 general_interrupt_handler:                        ;通用中断处理过程
@@ -67,7 +67,7 @@ init:    ;初始化内核的工作环境
 
          ;准备让处理器从虚拟地址空间的高端开始执行（现在依然在低端执行）
          mov rax, 0xffff800000000000              ;或者使用常量UPPER_LINEAR_START
-         add [rel position], rax                  ;内核程序的起始位置数据也必须转换成扩高地址
+         add [rel position], rax                  ;内核程序的起始位置数据也必须转换成扩高地址, rel = 效地址 = (下一条指令地址) + (dest 地址 - 下一条指令地址) = dest 地址
 
          ;内核的起始地址 + 标号.to_upper的汇编地址 = 标号.to_upper所在位置的运行时扩高地址
          mov rax, [rel position]
